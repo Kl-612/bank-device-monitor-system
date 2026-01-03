@@ -24,11 +24,7 @@ public class DeviceController {
         return deviceInfoMapper.selectAll();
     }
 
-    // GET方法：根据状态查询设备
-    @GetMapping("/status/{status}")
-    public List<DeviceInfo> getDevicesByStatus(@PathVariable String status) {
-        return deviceInfoMapper.selectByStatus(status);
-    }
+
 
     //POST方法
     @PostMapping
