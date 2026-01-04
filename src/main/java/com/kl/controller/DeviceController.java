@@ -1,12 +1,10 @@
 package com.kl.controller;
 
 import com.kl.entity.DeviceInfo;
-import com.kl.mapper.DeviceInfoMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -16,52 +14,165 @@ import java.util.Map;
 public class DeviceController {
 
     @Autowired
-    private DeviceInfoMapper deviceInfoMapper;
+    private com.kl.service.DeviceService deviceService;  // 注入Service
 
-    // GET方法
+    // GET 所有设备
     @GetMapping
-    public List<DeviceInfo> getAllDevices() {
-        return deviceInfoMapper.selectAll();
+    public ResponseEntity<Map<String, Object>> getAllDevices() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<DeviceInfo> devices = deviceService.getAllDevices();
+            response.put("success", true);
+            response.put("message", "查询成功");
+            response.put("total", devices.size());
+            response.put("data", devices);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "查询失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
     }
 
-    // GET方法：根据状态查询设备
+    // GET 按状态查询
     @GetMapping("/status/{status}")
-    public List<DeviceInfo> getDevicesByStatus(@PathVariable String status) {
-        return deviceInfoMapper.selectByStatus(status);
+    public ResponseEntity<Map<String, Object>> getDevicesByStatus(@PathVariable String status) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<DeviceInfo> devices = deviceService.getDevicesByStatus(status);
+            response.put("success", true);
+            response.put("message", "查询成功");
+            response.put("total", devices.size());
+            response.put("data", devices);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "查询失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
     }
 
-
-
-    //POST方法
+    // POST 添加设备
     @PostMapping
     public ResponseEntity<Map<String, Object>> addDevice(@RequestBody DeviceInfo device) {
         Map<String, Object> response = new HashMap<>();
-
         try {
-            // 银行业务逻辑：设置默认值
-            if (device.getStatus() == null) {
-                device.setStatus("OFFLINE");  // 新设备默认离线
-            }
-            if (device.getCreateTime() == null) {
-                device.setCreateTime(new Date());  // 当前时间
-            }
-
-            // 执行数据库插入
-            int result = deviceInfoMapper.insert(device);
-
-            if (result > 0) {
-                response.put("success", true);
-                response.put("message", "设备添加成功");
-                response.put("data", device);  // 包含自动生成的id
-                return ResponseEntity.status(201).body(response);
-            } else {
-                response.put("success", false);
-                response.put("message", "设备添加失败");
-                return ResponseEntity.status(500).body(response);
-            }
+            DeviceInfo savedDevice = deviceService.addDevice(device);
+            response.put("success", true);
+            response.put("message", "设备添加成功，等待验收上线");
+            response.put("data", savedDevice);
+            return ResponseEntity.status(201).body(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", "参数错误: " + e.getMessage());
+            return ResponseEntity.status(400).body(response);
         } catch (Exception e) {
             response.put("success", false);
-            response.put("message", "服务器错误: " + e.getMessage());
+            response.put("message", "添加失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // PUT 更新设备
+    @PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> updateDevice(
+            @PathVariable Integer id,
+            @RequestBody DeviceInfo device) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            DeviceInfo updatedDevice = deviceService.updateDevice(id, device);
+            response.put("success", true);
+            response.put("message", "设备更新成功");
+            response.put("data", updatedDevice);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", "参数错误: " + e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "更新失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // DELETE 删除设备
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> deleteDevice(@PathVariable Integer id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            deviceService.deleteDevice(id);
+            response.put("success", true);
+            response.put("message", "设备删除成功");
+            return ResponseEntity.ok(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "删除失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // 新增：设备统计接口
+    @GetMapping("/stats/summary")
+    public ResponseEntity<Map<String, Object>> getDeviceSummary() {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Map<String, Object> stats = deviceService.getDeviceStatistics();
+            response.put("success", true);
+            response.put("message", "统计信息获取成功");
+            response.put("data", stats);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "统计失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // 新增：设备状态变更接口
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<Map<String, Object>> updateDeviceStatus(
+            @PathVariable Integer id,
+            @RequestBody Map<String, String> request) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String newStatus = request.get("status");
+            String changeReason = request.get("reason");
+
+            if (newStatus == null || newStatus.isEmpty()) {
+                response.put("success", false);
+                response.put("message", "状态不能为空");
+                return ResponseEntity.status(400).body(response);
+            }
+
+            boolean success = deviceService.changeDeviceStatus(id, newStatus, changeReason);
+
+            if (success) {
+                response.put("success", true);
+                response.put("message", "设备状态更新成功");
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "状态更新失败");
+                return ResponseEntity.status(500).body(response);
+            }
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "状态更新失败: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
         }
     }

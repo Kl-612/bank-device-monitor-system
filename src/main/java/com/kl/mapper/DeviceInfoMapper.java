@@ -1,11 +1,10 @@
 package com.kl.mapper;
 
 import com.kl.entity.DeviceInfo;
-import org.apache.ibatis.annotations.Insert;
-import org.apache.ibatis.annotations.Mapper;
-import org.apache.ibatis.annotations.Options;
-import org.apache.ibatis.annotations.Select;
+import org.apache.ibatis.annotations.*;
+
 import java.util.List;
+import java.util.Map;
 
 @Mapper
 public interface DeviceInfoMapper {
@@ -21,4 +20,51 @@ public interface DeviceInfoMapper {
 
     @Options(useGeneratedKeys = true, keyProperty = "id")
     int insert(DeviceInfo deviceInfo);
+
+    // 1. 更新设备信息
+    @Update("<script>" +
+            "UPDATE device_info " +
+            "<set>" +
+            "  <if test='deviceName != null'>device_name = #{deviceName},</if>" +
+            "  <if test='deviceType != null'>device_type = #{deviceType},</if>" +
+            "  <if test='vendor != null'>vendor = #{vendor},</if>" +
+            "  <if test='model != null'>model = #{model},</if>" +
+            "  <if test='ipAddress != null'>ip_address = #{ipAddress},</if>" +
+            "  <if test='location != null'>location = #{location},</if>" +
+            "  <if test='branch != null'>branch = #{branch},</if>" +
+            "  <if test='status != null'>status = #{status},</if>" +
+            "  <if test='installDate != null'>install_date = #{installDate},</if>" +
+            "  <if test='warrantyPeriod != null'>warranty_period = #{warrantyPeriod},</if>" +
+            "  update_time = NOW()" +
+            "</set>" +
+            "WHERE id = #{id}" +
+            "</script>")
+    int update(DeviceInfo device);
+
+    // 2. 更新设备状态
+    @Update("UPDATE device_info SET status = #{status} WHERE id = #{id}")
+    int updateStatus(@Param("id") Integer id, @Param("status") String status);
+
+    // 3. 删除设备
+    @Delete("DELETE FROM device_info WHERE id = #{id}")
+    int deleteById(Integer id);
+
+    // 4. 根据ID查询单个设备（用于更新前的数据获取）
+    @Select("SELECT * FROM device_info WHERE id = #{id}")
+    DeviceInfo selectById(Integer id);
+
+    @Select("SELECT * FROM device_info WHERE device_id = #{deviceId}")
+    DeviceInfo selectByDeviceId(String deviceId);
+
+    @Select("SELECT COUNT(*) FROM device_info")
+    int countAll();
+
+    @Select("SELECT status, COUNT(*) as count FROM device_info GROUP BY status")
+    List<Map<String, Object>> countByStatus();
+
+    @Select("SELECT * FROM device_info WHERE device_type = #{deviceType}")
+    List<DeviceInfo> selectByDeviceType(String deviceType);
+
+    @Select("SELECT * FROM device_info WHERE branch LIKE CONCAT('%', #{branch}, '%')")
+    List<DeviceInfo> selectByBranch(String branch);
 }
