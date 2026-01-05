@@ -121,7 +121,7 @@ public class DeviceController {
         }
     }
 
-    // 新增：设备统计接口
+    // 设备统计接口
     @GetMapping("/stats/summary")
     public ResponseEntity<Map<String, Object>> getDeviceSummary() {
         Map<String, Object> response = new HashMap<>();
@@ -138,7 +138,7 @@ public class DeviceController {
         }
     }
 
-    // 新增：设备状态变更接口
+    // 设备状态变更接口
     @PatchMapping("/{id}/status")
     public ResponseEntity<Map<String, Object>> updateDeviceStatus(
             @PathVariable Integer id,
@@ -175,5 +175,66 @@ public class DeviceController {
             response.put("message", "状态更新失败: " + e.getMessage());
             return ResponseEntity.status(500).body(response);
         }
+    }
+
+    // 设备搜索接口
+    @GetMapping("/search")
+    public ResponseEntity<Map<String, Object>> searchDevices(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String deviceType,
+            @RequestParam(required = false) String branch) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            Map<String, Object> result = deviceService.searchDevices(keyword, deviceType, branch);
+            response.put("success", true);
+            response.put("data", result);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "搜索失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // 标记设备故障
+    @PostMapping("/{id}/mark-fault")
+    public ResponseEntity<Map<String, Object>> markDeviceAsFault(
+            @PathVariable Integer id,
+            @RequestBody Map<String, String> request) {
+
+        Map<String, Object> response = new HashMap<>();
+        try {
+            String faultReason = request.get("reason");
+            if (faultReason == null || faultReason.isEmpty()) {
+                throw new IllegalArgumentException("必须提供故障原因");
+            }
+
+            boolean success = deviceService.markDeviceAsFault(id, faultReason);
+
+            response.put("success", success);
+            response.put("message", success ? "设备已标记为故障" : "标记失败");
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "操作失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+    // 保修预警设备
+    @GetMapping("/stats/warranty-alert")
+    public ResponseEntity<List<Map<String, Object>>> getWarrantyAlertDevices() {
+        return ResponseEntity.ok(deviceService.getWarrantyAlertDevices());
+    }
+
+    // 故障分析报告
+    @GetMapping("/stats/fault-analysis")
+    public ResponseEntity<Map<String, Object>> getFaultAnalysis() {
+        return ResponseEntity.ok(deviceService.getFaultAnalysis());
     }
 }

@@ -7,6 +7,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.text.SimpleDateFormat;
 import java.util.*;
 
 @Service
@@ -142,15 +143,6 @@ public class DeviceServiceImpl implements DeviceService {
         return result > 0;
     }
 
-    @Override
-    public boolean markDeviceAsFault(Integer id, String faultReason) {
-        return false;
-    }
-
-    @Override
-    public boolean recoverDeviceFromFault(Integer id, String solution, String maintenancePerson) {
-        return false;
-    }
 
     @Override
     public Map<String, Object> getDeviceStatistics() {
@@ -181,22 +173,146 @@ public class DeviceServiceImpl implements DeviceService {
     }
 
     @Override
-    public Map<String, Object> searchDevices(String keyword, String deviceType, String branch) {
-        return Map.of();
+    public boolean markDeviceAsFault(Integer id, String faultReason) {
+        try {
+            // 1. 检查设备是否存在
+            DeviceInfo device = getDeviceById(id);
+            if (device == null) {
+                throw new RuntimeException("设备不存在，ID: " + id);
+            }
+
+            // 2. 银行业务规则：检查是否已经是故障状态
+            if ("FAULT".equals(device.getStatus())) {
+                System.out.println("设备已是故障状态，无需重复标记");
+                return false;
+            }
+
+            // 3. 更新状态为故障
+            boolean success = changeDeviceStatus(id, "FAULT", faultReason);
+
+            if (success) {
+                // 4. 这里可以记录到故障表（后续开发）
+                System.out.printf("设备标记为故障 [ID: %d, 名称: %s], 原因: %s%n",
+                        id, device.getDeviceName(), faultReason);
+
+                // 5. 银行特色：发送通知（模拟）
+                sendFaultNotification(device, faultReason);
+            }
+
+            return success;
+        } catch (Exception e) {
+            System.err.println("标记设备故障失败: " + e.getMessage());
+            return false;
+        }
     }
 
+    // 私有方法：发送故障通知（模拟）
+    private void sendFaultNotification(DeviceInfo device, String reason) {
+        String message = String.format(
+                "【银行设备故障报警】\n设备: %s (%s)\n位置: %s\n状态: %s -> FAULT\n原因: %s\n时间: %s",
+                device.getDeviceName(), device.getDeviceId(),
+                device.getLocation(), device.getStatus(), reason,
+                new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date())
+        );
+        System.out.println("发送通知: " + message);
+    }
 
     @Override
-    public List<DeviceInfo> getDevicesNearWarrantyExpiry() {
-        return Collections.emptyList();
+    public Map<String, Object> searchDevices(String keyword, String deviceType, String branch) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+
+            // Java代码过滤
+            List<DeviceInfo> allDevices = deviceInfoMapper.selectAll();
+            List<DeviceInfo> filteredDevices = filterDevices(allDevices, keyword, deviceType, branch);
+
+            // 构建结果
+            result.put("success", true);
+            result.put("total", filteredDevices.size());
+            result.put("devices", filteredDevices);
+
+            // 搜索条件记录（便于调试）
+            Map<String, String> searchParams = new HashMap<>();
+            if (keyword != null) searchParams.put("keyword", keyword);
+            if (deviceType != null) searchParams.put("deviceType", deviceType);
+            if (branch != null) searchParams.put("branch", branch);
+            result.put("searchParams", searchParams);
+
+        } catch (Exception e) {
+            result.put("success", false);
+            result.put("message", "搜索失败: " + e.getMessage());
+            result.put("total", 0);
+            result.put("devices", Collections.emptyList());
+        }
+
+        return result;
+    }
+
+    // 辅助方法：Java代码过滤
+    private List<DeviceInfo> filterDevices(List<DeviceInfo> devices,
+                                           String keyword,
+                                           String deviceType,
+                                           String branch) {
+        List<DeviceInfo> filtered = new ArrayList<>();
+
+        for (DeviceInfo device : devices) {
+            boolean match = true;
+
+            // 关键词匹配（多个字段）
+            if (keyword != null && !keyword.trim().isEmpty()) {
+                String lowerKeyword = keyword.toLowerCase().trim();
+                match = match && (
+                        device.getDeviceName().toLowerCase().contains(lowerKeyword) ||
+                                device.getDeviceId().toLowerCase().contains(lowerKeyword) ||
+                                device.getLocation().toLowerCase().contains(lowerKeyword) ||
+                                (device.getBranch() != null && device.getBranch().toLowerCase().contains(lowerKeyword))
+                );
+            }
+
+            // 设备类型匹配
+            if (deviceType != null && !deviceType.trim().isEmpty()) {
+                match = match && deviceType.trim().equalsIgnoreCase(device.getDeviceType());
+            }
+
+            // 支行匹配
+            if (branch != null && !branch.trim().isEmpty()) {
+                match = match && device.getBranch() != null &&
+                        device.getBranch().toLowerCase().contains(branch.toLowerCase().trim());
+            }
+
+            if (match) {
+                filtered.add(device);
+            }
+        }
+
+        return filtered;
     }
 
     @Override
     public List<DeviceInfo> getDevicesByBranch(String branch) {
-        if (branch == null || branch.isEmpty()) {
+        if (branch == null || branch.trim().isEmpty()) {
             return Collections.emptyList();
         }
-        return deviceInfoMapper.selectByBranch(branch);
+
+        try {
+            // 支持模糊查询
+            return deviceInfoMapper.selectByBranch("%" + branch.trim() + "%");
+        } catch (Exception e) {
+            System.err.println("按支行查询失败: " + e.getMessage());
+            return Collections.emptyList();
+        }
+    }
+
+    @Override
+    public List<Map<String, Object>> getWarrantyAlertDevices() {
+        return deviceInfoMapper.getWarrantyAlertDevices();
+    }
+
+
+    @Override
+    public Map<String, Object> getFaultAnalysis() {
+        return deviceInfoMapper.getFaultAnalysis();
     }
 
     // 私有方法：添加设备时的验证

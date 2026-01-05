@@ -21,13 +21,17 @@ public interface DeviceService {
     // 银行业务逻辑
     boolean changeDeviceStatus(Integer id, String newStatus, String changeReason);
     boolean markDeviceAsFault(Integer id, String faultReason);
-    boolean recoverDeviceFromFault(Integer id, String solution, String maintenancePerson);
 
     // 统计分析
     Map<String, Object> getDeviceStatistics();
     Map<String, Object> searchDevices(String keyword, String deviceType, String branch);
 
     // 银行特殊业务
-    List<DeviceInfo> getDevicesNearWarrantyExpiry();  // 保修即将到期
-    List<DeviceInfo> getDevicesByBranch(String branch);  // 按支行查询
+    List<DeviceInfo> getDevicesByBranch(String branch);
+
+    // 银行业务统计 - 保修预警
+    List<Map<String, Object>> getWarrantyAlertDevices();
+
+    // 银行业务统计 - 故障分析
+    Map<String, Object> getFaultAnalysis();
 }
