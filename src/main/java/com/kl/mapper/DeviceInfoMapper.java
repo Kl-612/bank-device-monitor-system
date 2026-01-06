@@ -125,4 +125,16 @@ public interface DeviceInfoMapper {
         return result;
     }
 
+    // 支行健康度统计
+    @Select("SELECT " +
+            "COALESCE(TRIM(branch), '未分配支行') as branch, " +
+            "CAST(COUNT(*) AS SIGNED) as total, " +
+            "CAST(SUM(CASE WHEN LOWER(status) = 'online' THEN 1 ELSE 0 END) AS SIGNED) as online, " +  // 用LOWER
+            "ROUND(SUM(CASE WHEN LOWER(status) = 'online' THEN 1 ELSE 0 END) * 100.0 / NULLIF(COUNT(*), 0), 2) as online_rate, " +
+            "CAST(SUM(CASE WHEN LOWER(status) = 'fault' THEN 1 ELSE 0 END) AS SIGNED) as fault_count " +  // 用LOWER
+            "FROM device_info " +
+            "GROUP BY COALESCE(TRIM(branch), '未分配支行') " +
+            "ORDER BY online_rate DESC")
+    List<Map<String, Object>> getBranchHealthStats();
+
 }

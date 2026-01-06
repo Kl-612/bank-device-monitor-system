@@ -7,7 +7,9 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @Service
@@ -313,6 +315,51 @@ public class DeviceServiceImpl implements DeviceService {
     @Override
     public Map<String, Object> getFaultAnalysis() {
         return deviceInfoMapper.getFaultAnalysis();
+    }
+
+    @Override
+    public Map<String, Object> getBranchHealthStats() {
+        // 1. 获取原始数据统计
+        List<Map<String, Object>> branchStats = deviceInfoMapper.getBranchHealthStats();
+
+        // 2. 计算总体在线率（修复类型转换）
+        long totalDevices = 0;
+        long totalOnline = 0;
+
+        for (Map<String, Object> stat : branchStats) {
+            // 处理 total（BigDecimal -> Long）
+            Object totalObj = stat.get("total");
+            long total = 0;
+            if (totalObj instanceof BigDecimal) {
+                total = ((BigDecimal) totalObj).longValue();
+            } else if (totalObj instanceof Long) {
+                total = (Long) totalObj;
+            } else if (totalObj instanceof Integer) {
+                total = ((Integer) totalObj).longValue();
+            }
+            totalDevices += total;
+
+            // 处理 online（BigDecimal -> Long）
+            Object onlineObj = stat.get("online");
+            long online = 0;
+            if (onlineObj instanceof BigDecimal) {
+                online = ((BigDecimal) onlineObj).longValue();
+            } else if (onlineObj instanceof Long) {
+                online = (Long) onlineObj;
+            } else if (onlineObj instanceof Integer) {
+                online = ((Integer) onlineObj).longValue();
+            }
+            totalOnline += online;
+        }
+
+        // 3. 返回结构化的数据
+        Map<String, Object> result = new HashMap<>();
+        result.put("branchStats", branchStats);
+        result.put("overallOnlineRate", totalDevices > 0 ?
+                String.format("%.2f%%", totalOnline * 100.0 / totalDevices) : "0%");
+        result.put("timestamp", LocalDateTime.now());
+
+        return result;
     }
 
     // 私有方法：添加设备时的验证

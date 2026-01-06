@@ -237,4 +237,11 @@ public class DeviceController {
     public ResponseEntity<Map<String, Object>> getFaultAnalysis() {
         return ResponseEntity.ok(deviceService.getFaultAnalysis());
     }
+
+    // 支行健康度统计
+    @GetMapping("/stats/branch-health")
+    public ResponseEntity<Map<String, Object>> getBranchHealthStats() {
+        return ResponseEntity.ok(deviceService.getBranchHealthStats());
+    }
+
 }

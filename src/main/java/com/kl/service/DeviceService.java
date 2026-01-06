@@ -34,4 +34,8 @@ public interface DeviceService {
 
     // 银行业务统计 - 故障分析
     Map<String, Object> getFaultAnalysis();
+
+    // 银行业务统计 - 支行健康度
+    Map<String, Object> getBranchHealthStats();
+
 }
