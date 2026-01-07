@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>银行设备监控仪表板</title>
+    <script src="https://cdn.bootcdn.net/ajax/libs/echarts/5.4.3/echarts.min.js"></script>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', Arial, sans-serif;
+            margin: 30px;
+            background: #f0f2f5;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h1 {
+            color: #1890ff;
+            margin-bottom: 10px;
+        }
+        .header p {
+            color: #666;
+        }
+        .chart-container {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        }
+        .chart-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+            border-left: 4px solid #1890ff;
+            padding-left: 10px;
+        }
+        .chart {
+            width: 100%;
+            height: 400px;
+        }
+        .stats-row {
+            display: flex;
+            justify-content: space-around;
+            margin-bottom: 30px;
+            flex-wrap: wrap;
+        }
+        .stat-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            width: 22%;
+            min-width: 200px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+            margin: 10px;
+        }
+        .stat-number {
+            font-size: 32px;
+            font-weight: bold;
+            color: #1890ff;
+            margin: 10px 0;
+        }
+        .stat-label {
+            color: #666;
+            font-size: 14px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        th, td {
+            padding: 12px 15px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        th {
+            background: #fafafa;
+            font-weight: 600;
+        }
+        tr:hover {
+            background: #f5f5f5;
+        }
+        @media (max-width: 768px) {
+            .chart {
+                height: 300px;
+            }
+            .stat-box {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+<div class="header">
+    <h1>🏦 银行设备监控仪表板</h1>
+    <p>实时监控各支行设备状态，保障金融服务连续性</p >
+</div>
+
+<!-- 关键指标 -->
+<div class="stats-row">
+    <div class="stat-box">
+        <div class="stat-label">整体在线率</div>
+        <div class="stat-number" id="overallRate">--%</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">总设备数</div>
+        <div class="stat-number" id="totalDevices">--</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">保修预警</div>
+        <div class="stat-number" id="warrantyAlerts">--</div>
+    </div>
+    <div class="stat-box">
+        <div class="stat-label">故障设备</div>
+        <div class="stat-number" id="faultDevices">--</div>
+    </div>
+</div>
+
+<!-- 支行健康度图表 -->
+<div class="chart-container">
+    <div class="chart-title">各支行设备在线率</div>
+    <div id="healthChart" class="chart"></div>
+</div>
+
+<!-- 保修预警表格 -->
+<div class="chart-container">
+    <div class="chart-title">保修到期预警（未来30天）</div>
+    <table id="warrantyTable">
+        <thead>
+        <tr>
+            <th>设备名称</th>
+            <th>所属支行</th>
+            <th>到期日期</th>
+            <th>剩余天数</th>
+        </tr>
+        </thead>
+        <tbody id="warrantyTableBody">
+        <!-- 数据由JS填充 -->
+        <tr><td colspan="4" style="text-align:center;padding:20px;">加载中...</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 故障分析图表 -->
+<div class="chart-container">
+    <div class="chart-title">故障类型与平均修复时间</div>
+    <div id="faultChart" class="chart"></div>
+</div>
+
+<!-- 底部信息 -->
+<div style="text-align:center;color:#999;margin-top:30px;font-size:14px;">
+    数据更新时间: <span id="updateTime">--</span>
+</div>
+
+<script>
+    // 初始化图表
+    const healthChart = echarts.init(document.getElementById('healthChart'));
+    const faultChart = echarts.init(document.getElementById('faultChart'));
+
+    // 加载所有数据
+    async function loadData() {
+        try {
+            // 并行加载3个接口的数据
+            const [healthData, warrantyData, faultData, devicesData] = await Promise.all([
+                fetch('/api/devices/stats/branch-health').then(r => r.json()),
+                fetch('/api/devices/stats/warranty-alert').then(r => r.json()),
+                fetch('/api/devices/stats/fault-analysis').then(r => r.json()),
+                fetch('/api/devices').then(r => r.json())
+            ]);
+
+            // 更新指标卡片
+            updateMetrics(healthData, warrantyData, faultData, devicesData);
+
+            // 渲染图表
+            renderHealthChart(healthData);
+            renderFaultChart(faultData);
+
+            // 填充预警表格
+            renderWarrantyTable(warrantyData);
+
+            // 更新时间
+            document.getElementById('updateTime').textContent = new Date().toLocaleString('zh-CN');
+
+        } catch (error) {
+            console.error('加载数据失败:', error);
+            alert('数据加载失败，请检查后端服务是否运行');
+        }
+    }
+
+    // 更新指标卡片
+    function updateMetrics(healthData, warrantyData, faultData, devicesData) {
+        // 整体在线率
+        document.getElementById('overallRate').textContent = healthData.overallOnlineRate || '--%';
+
+        // 总设备数
+        document.getElementById('totalDevices').textContent = devicesData.data?.length || '--';
+
+        // 保修预警数量
+        document.getElementById('warrantyAlerts').textContent = warrantyData.length || '0';
+
+        // 故障设备数（从健康度数据计算）
+        let faultCount = 0;
+        if (healthData.branchStats) {
+            healthData.branchStats.forEach(branch => {
+                faultCount += branch.fault_count || 0;
+            });
+        }
+        document.getElementById('faultDevices').textContent = faultCount;
+    }
+
+    // 渲染支行健康度图表
+    function renderHealthChart(data) {
+        if (!data.branchStats) return;
+
+        const branches = data.branchStats.map(item => item.branch);
+        const rates = data.branchStats.map(item => item.online_rate);
+        const onlineCounts = data.branchStats.map(item => `${item.online}/${item.total}`);
+
+        const option = {
+            tooltip: {
+                trigger: 'axis',
+                formatter: function(params) {
+                    const data = params[0];
+                    return `${data.name}<br/>在线率: ${data.value}%<br/>在线设备: ${onlineCounts[data.dataIndex]}`;
+                }
+            },
+            xAxis: {
+                type: 'category',
+                data: branches,
+                axisLabel: { rotate: 30 }
+            },
+            yAxis: {
+                type: 'value',
+                name: '在线率(%)',
+                max: 100
+            },
+            series: [{
+                data: rates,
+                type: 'bar',
+                itemStyle: {
+                    color: function(params) {
+                        return params.value >= 90 ? '#52c41a' :
+                            params.value >= 70 ? '#1890ff' :
+                                params.value >= 50 ? '#faad14' : '#ff4d4f';
+                    }
+                },
+                label: {
+                    show: true,
+                    position: 'top',
+                    formatter: '{c}%'
+                }
+            }]
+        };
+
+        healthChart.setOption(option);
+    }
+
+    // 渲染故障分析图表
+    function renderFaultChart(data) {
+        if (!data.faultAnalysis || data.faultAnalysis.length === 0) {
+            faultChart.setOption({
+                title: {
+                    text: '暂无故障记录',
+                    left: 'center',
+                    top: 'center',
+                    textStyle: { color: '#999', fontSize: 16 }
+                }
+            });
+            return;
+        }
+
+        const faultTypes = data.faultAnalysis.map(item => item.faultCode);
+        const fixTimes = data.faultAnalysis.map(item => item.avgFixTimeMinutes);
+
+        const option = {
+            tooltip: {
+                trigger: 'axis',
+                formatter: function(params) {
+                    const minutes = params[0].value;
+                    const hours = (minutes / 60).toFixed(1);
+                    return `${params[0].name}<br/>平均修复时间: ${minutes}分钟 (${hours}小时)`;
+                }
+            },
+            xAxis: {
+                type: 'category',
+                data: faultTypes
+            },
+            yAxis: {
+                type: 'value',
+                name: '修复时间(分钟)'
+            },
+            series: [{
+                data: fixTimes,
+                type: 'bar',
+                itemStyle: {
+                    color: '#ff4d4f'
+                },
+                label: {
+                    show: true,
+                    position: 'top',
+                    formatter: function(params) {
+                        const hours = (params.value / 60).toFixed(1);
+                        return hours + 'h';
+                    }
+                }
+            }]
+        };
+
+        faultChart.setOption(option);
+    }
+
+    // 渲染保修预警表格
+    function renderWarrantyTable(data) {
+        const tbody = document.getElementById('warrantyTableBody');
+
+        if (!data || data.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;padding:20px;color:#999;">暂无保修到期设备</td></tr>';
+            return;
+        }
+
+        let html = '';
+        data.forEach(device => {
+            const daysLeft = device.daysRemaining;
+            let warning = '';
+            if (daysLeft <= 7) warning = '⚠️ ';
+
+            html += `
+                <tr>
+                    <td>${warning}${device.deviceName || device.deviceId}</td>
+                    <td>${device.branch || '--'}</td>
+                    <td>${device.warrantyEndDate ? device.warrantyEndDate.split('T')[0] : '--'}</td>
+                    <td style="color:${daysLeft <= 7 ? '#ff4d4f' : daysLeft <= 30 ? '#faad14' : '#52c41a'}">
+                        ${daysLeft}天
+                    </td>
+                </tr>`;
+        });
+
+        tbody.innerHTML = html;
+    }
+
+    // 页面加载时执行
+    document.addEventListener('DOMContentLoaded', loadData);
+
+    // 每60秒自动刷新
+    setInterval(loadData, 60000);
+</script>
+</body>
+</html>
