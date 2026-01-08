@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🏦 银行设备实时状态监控中心</title>
+
+    <style>
+        :root {
+            --bank-blue: #1a5f7a;
+            --bank-green: #00c853;
+            --bank-red: #ff5252;
+            --bank-yellow: #ffd740;
+            --bank-gray: #607d8b;
+            --bank-bg: #0f1a2a;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Microsoft YaHei', 'Segoe UI', 'Arial', sans-serif;
+            background: var(--bank-bg);
+            color: #ffffff;
+            overflow-x: hidden;
+            min-height: 100vh;
+        }
+
+        /* 监控大屏标题 */
+        .monitor-header {
+            background: linear-gradient(90deg, #0c2461 0%, #1e3799 50%, #0c2461 100%);
+            padding: 1.5rem 2rem;
+            border-bottom: 3px solid #00d4ff;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.5);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .monitor-header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, #00d4ff, transparent);
+            animation: scanline 3s linear infinite;
+        }
+
+        @keyframes scanline {
+            0% { left: -100%; }
+            100% { left: 100%; }
+        }
+
+        .monitor-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .monitor-title h1 {
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .monitor-title h1 i {
+            color: #00d4ff;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .live-badge {
+            background: #ff4757;
+            color: white;
+            padding: 0.4rem 1rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            animation: blink 1.5s infinite;
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        /* 关键指标 */
+        .stats-overview {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.2rem;
+            padding: 1.5rem 2rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .stat-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.2rem;
+            border-left: 4px solid;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .stat-card:hover {
+            transform: translateY(-3px);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.2);
+        }
+
+        .stat-card.total { border-color: #3498db; }
+        .stat-card.online { border-color: #2ecc71; }
+        .stat-card.fault { border-color: #e74c3c; }
+        .stat-card.maintenance { border-color: #f39c12; }
+
+        .stat-label {
+            font-size: 0.9rem;
+            color: #aaa;
+            margin-bottom: 0.5rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .stat-value {
+            font-size: 2.2rem;
+            font-weight: 700;
+            color: white;
+        }
+
+        .stat-trend {
+            font-size: 0.8rem;
+            margin-top: 0.5rem;
+            opacity: 0.8;
+        }
+
+        /* 设备网格 */
+        .devices-container {
+            padding: 1.5rem 2rem;
+        }
+
+        .section-title {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.8rem;
+            border-bottom: 2px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section-title h2 {
+            font-size: 1.4rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .refresh-btn {
+            background: #1e90ff;
+            color: white;
+            border: none;
+            padding: 0.6rem 1.2rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .refresh-btn:hover {
+            background: #007bff;
+            transform: scale(1.05);
+        }
+
+        .refresh-btn:active {
+            transform: scale(0.95);
+        }
+
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1.2rem;
+        }
+
+        .device-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 1.2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .device-card:hover {
+            transform: translateY(-5px);
+            border-color: rgba(0, 212, 255, 0.5);
+            box-shadow: 0 10px 25px rgba(0, 212, 255, 0.3);
+        }
+
+        .device-status-indicator {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 8px;
+            height: 100%;
+            border-radius: 0 12px 12px 0;
+        }
+
+        .status-online { background: linear-gradient(to bottom, #00c853, #64dd17); }
+        .status-offline { background: linear-gradient(to bottom, #ff9800, #ffb74d); }
+        .status-fault {
+            background: linear-gradient(to bottom, #ff5252, #ff8a80);
+            animation: faultGlow 2s infinite;
+        }
+        .status-maintenance { background: linear-gradient(to bottom, #ffd740, #ffeb3b); }
+
+        @keyframes faultGlow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .device-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 1rem;
+        }
+
+        .device-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            color: white;
+        }
+
+        .atm-icon { background: linear-gradient(135deg, #3498db, #2980b9); }
+        .vtm-icon { background: linear-gradient(135deg, #9b59b6, #8e44ad); }
+        .sc-icon { background: linear-gradient(135deg, #2ecc71, #27ae60); }
+        .net-icon { background: linear-gradient(135deg, #e74c3c, #c0392b); }
+        .other-icon { background: linear-gradient(135deg, #95a5a6, #7f8c8d); }
+
+        .device-info h3 {
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.2rem;
+        }
+
+        .device-id {
+            font-size: 0.85rem;
+            color: #aaa;
+            font-family: monospace;
+        }
+
+        .device-details {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0.8rem;
+            font-size: 0.9rem;
+        }
+
+        .detail-item {
+            display: flex;
+            flex-direction: column;
+            gap: 0.2rem;
+        }
+
+        .detail-label {
+            color: #aaa;
+            font-size: 0.8rem;
+        }
+
+        .detail-value {
+            font-weight: 500;
+            color: white;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 0.3rem 0.8rem;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-online { background: rgba(0, 200, 83, 0.2); color: #00c853; }
+        .badge-offline { background: rgba(255, 152, 0, 0.2); color: #ff9800; }
+        .badge-fault { background: rgba(255, 82, 82, 0.2); color: #ff5252; }
+        .badge-maintenance { background: rgba(255, 215, 64, 0.2); color: #ffd740; }
+
+        /* 支行筛选 */
+        .filter-bar {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            background: rgba(255, 255, 255, 0.1);
+            color: #ddd;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            padding: 0.5rem 1.2rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .filter-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        .filter-btn.active {
+            background: #1e90ff;
+            color: white;
+            border-color: #1e90ff;
+        }
+
+        /* 底部信息 */
+        .monitor-footer {
+            margin-top: 2rem;
+            padding: 1.5rem 2rem;
+            background: rgba(0, 0, 0, 0.3);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .update-time {
+            color: #00d4ff;
+            font-weight: 500;
+        }
+
+        /* 空状态 */
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 3rem;
+            color: #777;
+        }
+
+        /* 响应式设计 */
+        @media (max-width: 768px) {
+            .monitor-header, .stats-overview, .devices-container {
+                padding: 1rem;
+            }
+
+            .devices-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .monitor-title h1 {
+                font-size: 1.4rem;
+            }
+
+            .stat-value {
+                font-size: 1.8rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .monitor-title {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 1rem;
+            }
+
+            .device-details {
+                grid-template-columns: 1fr;
+            }
+
+            .filter-bar {
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 监控大屏头部 -->
+    <header class="monitor-header">
+        <div class="monitor-title">
+            <h1>
+                <i class="icon">📡</i>
+                银行设备实时状态监控中心
+            </h1>
+            <div class="live-badge">
+                <span class="dot" style="
+                    width: 8px;
+                    height: 8px;
+                    background: #ff4757;
+                    border-radius: 50%;
+                    animation: blink 1.5s infinite;
+                "></span>
+                实时监控中
+            </div>
+        </div>
+    </header>
+
+    <!-- 关键指标 -->
+    <section class="stats-overview">
+        <div class="stat-card total">
+            <div class="stat-label">
+                <span>📊</span> 总设备数
+            </div>
+            <div class="stat-value" id="totalDevices">--</div>
+            <div class="stat-trend">全行覆盖</div>
+        </div>
+
+        <div class="stat-card online">
+            <div class="stat-label">
+                <span>✅</span> 在线设备
+            </div>
+            <div class="stat-value" id="onlineDevices">--</div>
+            <div class="stat-trend" id="onlineRate">在线率: --%</div>
+        </div>
+
+        <div class="stat-card fault">
+            <div class="stat-label">
+                <span>⚠️</span> 故障设备
+            </div>
+            <div class="stat-value" id="faultDevices">--</div>
+            <div class="stat-trend" id="faultRate">故障率: --%</div>
+        </div>
+
+        <div class="stat-card maintenance">
+                    <div class="stat-label">
+                        <span>🔧</span> 维护中设备
+                    </div>
+                    <div class="stat-value" id="maintenanceDevices">--</div>
+                    <div class="stat-trend">计划性维护</div>
+                </div>
+            </section>
+
+            <!-- 设备监控区域 -->
+            <main class="devices-container">
+                <div class="section-title">
+                    <h2>
+                        <span>🖥️</span>
+                        设备状态监控面板
+                        <span style="font-size: 0.9rem; color: #aaa; margin-left: 10px;">
+                            共 <span id="deviceCount">0</span> 台设备
+                        </span>
+                    </h2>
+                    <button class="refresh-btn" onclick="loadDevices()">
+                        <span>🔄</span>
+                        刷新数据
+                        <span id="lastRefresh">刚刚</span>
+                    </button>
+                </div>
+
+                <!-- 支行筛选 -->
+                <div class="filter-bar" id="branchFilter">
+                    <button class="filter-btn active" data-branch="all">全部支行</button>
+                    <!-- 动态生成支行筛选按钮 -->
+                </div>
+
+                <!-- 设备网格 -->
+                <div class="devices-grid" id="devicesGrid">
+                    <!-- 设备卡片由JS动态生成 -->
+                    <div class="empty-state">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">📡</div>
+                        <h3>正在加载设备数据...</h3>
+                        <p>请稍候，正在连接到监控服务器</p >
+                    </div>
+                </div>
+            </main>
+
+            <!-- 底部信息 -->
+            <footer class="monitor-footer">
+                <div>
+                    <span>🕐 最后更新: <span class="update-time" id="updateTime">--</span></span>
+                    <span style="margin: 0 1rem;">|</span>
+                    <span>📡 监控系统版本: 1.0.0</span>
+                    <span style="margin: 0 1rem;">|</span>
+                    <span>🏦 数据来源: 银行设备管理数据库</span>
+                </div>
+                <div style="margin-top: 0.5rem; font-size: 0.8rem; color: #777;">
+                    <span>状态说明: </span>
+                    <span class="status-badge badge-online" style="margin: 0 0.3rem;">在线</span>
+                    <span class="status-badge badge-offline" style="margin: 0 0.3rem;">离线</span>
+                    <span class="status-badge badge-fault" style="margin: 0 0.3rem;">故障</span>
+                    <span class="status-badge badge-maintenance" style="margin: 0 0.3rem;">维护</span>
+                </div>
+            </footer>
+
+            <script>
+                // 全局变量
+                let allDevices = [];
+                let currentBranch = 'all';
+
+                // 设备图标映射
+                const deviceIcons = {
+                    'ATM': { icon: '🏧', class: 'atm-icon' },
+                    'VTM': { icon: '💻', class: 'vtm-icon' },
+                    '智能柜台': { icon: '🤖', class: 'sc-icon' },
+                    '网络设备': { icon: '🌐', class: 'net-icon' },
+                    'default': { icon: '💾', class: 'other-icon' }
+                };
+
+                // 状态映射
+                const statusConfig = {
+                    'online': { label: '在线', badge: 'badge-online', indicator: 'status-online' },
+                    'offline': { label: '离线', badge: 'badge-offline', indicator: 'status-offline' },
+                    'fault': { label: '故障', badge: 'badge-fault', indicator: 'status-fault' },
+                    'maintenance': { label: '维护', badge: 'badge-maintenance', indicator: 'status-maintenance' }
+                };
+
+                // 页面加载时初始化
+                document.addEventListener('DOMContentLoaded', function() {
+                    loadDevices();
+                    // 每30秒自动刷新
+                    setInterval(loadDevices, 30000);
+                });
+
+                // 加载设备数据
+                async function loadDevices() {
+                    try {
+                        showLoading();
+
+                        // 调用后端API
+                        const response = await fetch('/api/devices');
+                        if (!response.ok) throw new Error('API请求失败');
+
+                        const result = await response.json();
+                        allDevices = result.data || [];
+
+                        // 更新统计数据
+                        updateStatistics(allDevices);
+
+                        // 更新支行筛选
+                        updateBranchFilter(allDevices);
+
+                        // 渲染设备卡片
+                        renderDevices(allDevices);
+
+                        // 更新最后刷新时间
+                        updateRefreshTime();
+
+                    } catch (error) {
+                        console.error('加载设备数据失败:', error);
+                        showError('数据加载失败，请检查网络连接');
+                    }
+                }
+
+                // 更新统计数据
+                function updateStatistics(devices) {
+                    const total = devices.length;
+                    const online = devices.filter(d => d.status === 'online').length;
+                    const fault = devices.filter(d => d.status === 'fault').length;
+                    const maintenance = devices.filter(d => d.status === 'maintenance').length;
+
+                    document.getElementById('totalDevices').textContent = total;
+                    document.getElementById('onlineDevices').textContent = online;
+                    document.getElementById('faultDevices').textContent = fault;
+                    document.getElementById('maintenanceDevices').textContent = maintenance;
+                    document.getElementById('deviceCount').textContent = total;
+
+                    // 计算比率
+                    const onlineRate = total > 0 ? ((online / total) * 100).toFixed(1) : 0;
+                    const faultRate = total > 0 ? ((fault / total) * 100).toFixed(1) : 0;
+
+                    document.getElementById('onlineRate').textContent = `在线率: ${onlineRate}%`;
+                    document.getElementById('faultRate').textContent = `故障率: ${faultRate}%`;
+                }
+
+                // 更新支行筛选
+                function updateBranchFilter(devices) {
+                    const branches = [...new Set(devices.map(d => d.branch).filter(b => b))];
+                    const filterBar = document.getElementById('branchFilter');
+
+                    // 保留"全部支行"按钮
+                    const allBtn = filterBar.querySelector('[data-branch="all"]');
+                    filterBar.innerHTML = '';
+                    filterBar.appendChild(allBtn);
+
+                    // 添加支行按钮
+                    branches.forEach(branch => {
+                        const btn = document.createElement('button');
+                        btn.className = 'filter-btn';
+                        btn.dataset.branch = branch;
+                        btn.textContent = branch;
+                        btn.onclick = () => filterByBranch(branch);
+                        filterBar.appendChild(btn);
+                    });
+                }
+
+                // 按支行筛选
+                function filterByBranch(branch) {
+                    currentBranch = branch;
+
+                    // 更新按钮状态
+                    document.querySelectorAll('.filter-btn').forEach(btn => {
+                        btn.classList.toggle('active', btn.dataset.branch === branch);
+                    });
+
+                    // 筛选设备
+                    const filteredDevices = branch === 'all'
+                        ? allDevices
+                        : allDevices.filter(device => device.branch === branch);
+
+                    renderDevices(filteredDevices);
+                }
+
+                // 渲染设备卡片
+                function renderDevices(devices) {
+                    const grid = document.getElementById('devicesGrid');
+
+                    if (!devices || devices.length === 0) {
+                        grid.innerHTML = `
+                            <div class="empty-state">
+                                <div style="font-size: 3rem; margin-bottom: 1rem;">🔍</div>
+                                <h3>未找到设备数据</h3>
+                                <p>当前筛选条件下无设备信息</p >
+                            </div>`;
+                        return;
+                    }
+
+                    let html = '';
+
+                    devices.forEach(device => {
+                        const iconConfig = deviceIcons[device.deviceType] || deviceIcons.default;
+                        const status = statusConfig[device.status] || statusConfig.offline;
+
+                        html += `
+                        <div class="device-card">
+                            <div class="device-status-indicator ${status.indicator}"></div>
+
+                            <div class="device-header">
+                                <div class="device-icon ${iconConfig.class}">
+                                    ${iconConfig.icon}
+                                </div>
+                                <div class="device-info">
+                                    <h3>${device.deviceName}</h3>
+                                    <div class="device-id">${device.deviceId}</div>
+                                </div>
+                            </div>
+
+                            <div class="device-details">
+                                <div class="detail-item">
+                                    <span class="detail-label">支行</span>
+                                    <span class="detail-value">${device.branch || '--'}</span>
+                                </div>
+
+                                <div class="detail-item">
+                                    <span class="detail-label">类型</span>
+                                    <span class="detail-value">${device.deviceType}</span>
+                                </div>
+
+                                <div class="detail-item">
+                                    <span class="detail-label">安装日期</span>
+                                    <span class="detail-value">${formatDate(device.installDate)}</span>
+                                </div>
+
+                                <div class="detail-item">
+                                    <span class="detail-label">状态</span>
+                                    <span class="status-badge ${status.badge}">${status.label}</span>
+                                </div>
+                            </div>
+
+                            ${device.ipAddress ? `
+                            <div style="margin-top: 0.8rem; font-size: 0.85rem; color: #aaa;">
+                                <span>IP: ${device.ipAddress}</span>
+                            </div>
+                            ` : ''}
+                        </div>`;
+                    });
+
+                    grid.innerHTML = html;
+                }
+
+                // 格式化日期
+                function formatDate(dateString) {
+                    if (!dateString) return '--';
+                    const date = new Date(dateString);
+                    return date.toLocaleDateString('zh-CN');
+                }
+
+                // 显示加载状态
+                function showLoading() {
+                    const grid = document.getElementById('devicesGrid');
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <div class="loading-spinner" style="
+                                width: 40px;
+                                height: 40px;
+                                border: 3px solid rgba(255,255,255,0.3);
+                                border-radius: 50%;
+                                border-top-color: #00d4ff;
+                                margin: 0 auto 1rem;
+                                animation: spin 1s linear infinite;
+                            "></div>
+                            <h3>正在加载设备数据...</h3>
+                            <p>请稍候，正在连接到监控服务器</p >
+                        </div>`;
+                }
+
+                // 显示错误
+                function showError(message) {
+                    const grid = document.getElementById('devicesGrid');
+                    grid.innerHTML = `
+                        <div class="empty-state">
+                            <div style="font-size: 3rem; margin-bottom: 1rem;">❌</div>
+                            <h3>数据加载失败</h3>
+                            <p>${message}</p >
+                            <button onclick="loadDevices()" style="
+                                margin-top: 1rem;
+                                padding: 0.5rem 1.5rem;
+                                background: #1e90ff;
+                                color: white;
+                                border: none;
+                                border-radius: 6px;
+                                cursor: pointer;
+                            ">重试</button>
+                        </div>`;
+                }
+
+                // 更新刷新时间
+                function updateRefreshTime() {
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('zh-CN', {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        second: '2-digit'
+                    });
+
+                    document.getElementById('lastRefresh').textContent = timeStr;
+                    document.getElementById('updateTime').textContent = timeStr;
+                }
+
+                // 添加CSS动画
+                const style = document.createElement('style');
+                style.textContent = `
+                    @keyframes spin {
+                        0% { transform: rotate(0deg); }
+                        100% { transform: rotate(360deg); }
+                    }
+                `;
+                document.head.appendChild(style);
+            </script>
+        </body>
+        </html>
