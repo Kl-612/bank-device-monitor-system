@@ -34,6 +34,31 @@ public class DeviceController {
         }
     }
 
+    // GET 按ID查询
+    @GetMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> getDeviceById(@PathVariable Integer id) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            DeviceInfo device = deviceService.getDeviceById(id);
+            response.put("success", true);
+            response.put("message", "查询成功");
+            response.put("data", device);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", "参数错误: " + e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (RuntimeException e) {
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.status(404).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "查询失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
     // GET 按状态查询
     @GetMapping("/status/{status}")
     public ResponseEntity<Map<String, Object>> getDevicesByStatus(@PathVariable String status) {
