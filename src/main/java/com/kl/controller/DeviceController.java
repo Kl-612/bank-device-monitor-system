@@ -59,6 +59,29 @@ public class DeviceController {
         }
     }
 
+    // GET 按支行查询
+    @GetMapping("/branch/{branch}")
+    public ResponseEntity<Map<String, Object>> getDevicesByBranch(@PathVariable String branch) {
+        Map<String, Object> response = new HashMap<>();
+        try {
+            List<DeviceInfo> devices = deviceService.getDevicesByBranch(branch);
+            response.put("success", true);
+            response.put("message", "查询成功");
+            response.put("total", devices.size());
+            response.put("data", devices);
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            response.put("success", false);
+            response.put("message", "参数错误: " + e.getMessage());
+            return ResponseEntity.status(400).body(response);
+        } catch (Exception e) {
+            response.put("success", false);
+            response.put("message", "查询失败: " + e.getMessage());
+            return ResponseEntity.status(500).body(response);
+        }
+    }
+
+
     // GET 按状态查询
     @GetMapping("/status/{status}")
     public ResponseEntity<Map<String, Object>> getDevicesByStatus(@PathVariable String status) {
