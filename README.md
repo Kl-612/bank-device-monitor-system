@@ -101,7 +101,9 @@ CREATE TABLE `device_fault_record` (
 | 方法 | 端点 | 功能 | 参数 | 状态码 |
 |------|------|------|------|--------|
 | **GET** | `/api/devices` | 获取所有设备列表 | 无 | 200成功 / 500失败 |
+| **GET** | `/api/devices/{id}` | 按ID查询设备 | `id`| 200成功 /400参数错误/404不存在/ 500失败 |
 | **GET** | `/api/devices/status/{status}` | 按状态查询设备 | `status` | 200成功 / 500失败 |
+| **GET** | `/api/devices/branch/{branch}` | 按支行查询设备 | `branch`| 200成功 /400参数错误/ 500失败 |
 | **POST** | `/api/devices` | 添加新设备 | `DeviceInfo对象` | 201创建 / 400参数错误 / 500失败 |
 | **PUT** | `/api/devices/{id}` | 更新设备信息 | `id`, `DeviceInfo对象` | 200成功 / 400参数错误 / 500失败 |
 | **DELETE** | `/api/devices/{id}` | 删除设备 | `id` | 200成功 / 400业务错误 / 500失败 |
